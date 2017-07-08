@@ -16,8 +16,8 @@ android {
         applicationId "studio.papercube.pinyinfinder.android"
         minSdkVersion 15
         targetSdkVersion 24
-        versionCode 26
-        versionName "0.8-beta2"
+        versionCode 30
+        versionName "17.07"
 //        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -45,12 +45,14 @@ dependencies {
     })
     compile 'com.android.support:appcompat-v7:24.2.0'
     compile 'com.android.support:design:24.2.0'
+    compile 'com.android.support:support-annotations:24.2.0'
     //    testCompile 'junit:junit:4.12'
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     compile "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
 
-    compile 'cn.bmob.android:bmob-sdk:3.5.5'
-    compile 'cn.bmob.android:http-legacy:1.0'
+    compile 'com.squareup.okhttp3:okhttp:3.8.1'
+    compile 'com.google.code.gson:gson:2.8.1'
+
 }
 
 repositories {

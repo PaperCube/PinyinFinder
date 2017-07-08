@@ -1,9 +1,7 @@
 package studio.papercube.pinyinfinder
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.*
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
@@ -13,31 +11,30 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.*
-import cn.bmob.v3.Bmob
+import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.ListView
+import android.widget.TextView
 import studio.papercube.pinyinfinder.annotations.LongOperationAgainstUIThread
 import studio.papercube.pinyinfinder.annotations.RunOnCurrentThread
 import studio.papercube.pinyinfinder.annotations.RunnableOnAnyThread
 import studio.papercube.pinyinfinder.annotations.UiThreadRequired
 import studio.papercube.pinyinfinder.concurrent.Processor
+import studio.papercube.pinyinfinder.concurrent.sharedThreadPool
 import studio.papercube.pinyinfinder.content.LOG_TAG_PYF_GENERAL
-import studio.papercube.pinyinfinder.content.PermissionHelper
-import studio.papercube.pinyinfinder.content.REQUEST_READ_PHONE_STATE
-import studio.papercube.pinyinfinder.content.permissionGranted
 import studio.papercube.pinyinfinder.dataloader.DataSet
 import studio.papercube.pinyinfinder.dataloader.InternalDataSets
 import studio.papercube.pinyinfinder.dataloader.MultiSourceDataLoader
 import studio.papercube.pinyinfinder.datatransfer.AppLaunch
-import studio.papercube.pinyinfinder.datatransfer.save
+import studio.papercube.pinyinfinder.datatransfer.createBmobPostRequest
+import studio.papercube.pinyinfinder.datatransfer.newCallWith
+import studio.papercube.pinyinfinder.datatransfer.sharedOkHttpClient
 import studio.papercube.pinyinfinder.localcommand.Command
 import studio.papercube.pinyinfinder.update.GitRemoteAccess
 import studio.papercube.pinyinfinder.update.Update
 import studio.papercube.pinyinfinder.update.UpdateFailure
 import studio.papercube.pinyinfinder.update.UpdateFailure.CausedBy.*
 import studio.papercube.pinyinfinder.update.Updator
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 
 /**
  * 应用程序的主界面。第一个活动
@@ -112,8 +109,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         }
     }.startThread()
 
-    private val permissionLock: ReentrantLock = ReentrantLock()
-    private val bmobPermissionGrantingCondition = permissionLock.newCondition()
+//    private val permissionLock: ReentrantLock = ReentrantLock()
+//    private val bmobPermissionGrantingCondition = permissionLock.newCondition()
 
     /**
      * 创建应用程序界面时调用。
@@ -137,17 +134,6 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         Updator.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本号
 
         createProgressDialog("正在加载数据") {
-            if (permissionGranted(Manifest.permission.READ_PHONE_STATE)) {
-                initBmob()
-            } else {
-                permissionLock.withLock {
-                    PermissionHelper.requestPermissions(this, REQUEST_READ_PHONE_STATE, Manifest.permission.READ_PHONE_STATE)
-                    bmobPermissionGrantingCondition.await(15, TimeUnit.SECONDS)
-                }
-
-                initBmob()
-            }
-
             loadPreferredData()
             if (InternalDataSets.hasExpired()) additionalTextMgr.append("数据已过期。这是${InternalDataSets.targetYear}年的。")
             editTextSearch.addTextChangedListener(AfterTextChangedListener { onTextChanged(it.trim()) }) //为输入框指定文字改变时的监听器
@@ -191,25 +177,25 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        when (requestCode) {
-            REQUEST_READ_PHONE_STATE -> {
-                permissionLock.withLock {
-                    grantResults.firstOrNull()?.takeIf { it == PackageManager.PERMISSION_GRANTED }?.run {
-                        Log.i(LOG_TAG_PYF_GENERAL, "Permission: Read phone state: granted.")
-                    } ?: run {
-                        Toast.makeText(this, "读取设备识别码权限被拒绝。一些功能可能无法正常运行。", Toast.LENGTH_SHORT)
-                                .show()
-                        Log.i(LOG_TAG_PYF_GENERAL, "Access Denied: Read phone state.")
-                    }
-
-                    bmobPermissionGrantingCondition.signalAll()
-                }
-            }
-        }
+//        when (requestCode) {
+//            REQUEST_READ_PHONE_STATE -> {
+//                permissionLock.withLock {
+//                    grantResults.firstOrNull()?.takeIf { it == PackageManager.PERMISSION_GRANTED }?.run {
+//                        Log.i(LOG_TAG_PYF_GENERAL, "Permission: Read phone state: granted.")
+//                    } ?: run {
+//                        Toast.makeText(this, "读取设备识别码权限被拒绝。一些功能可能无法正常运行。", Toast.LENGTH_SHORT)
+//                                .show()
+//                        Log.i(LOG_TAG_PYF_GENERAL, "Access Denied: Read phone state.")
+//                    }
+//
+//                    bmobPermissionGrantingCondition.signalAll()
+//                }
+//            }
+//        }
     }
 
     private fun initBmob(): Boolean {
-        Bmob.initialize(this@MainActivity, "4374418a729ed75475eebf3028c7e233", "Direct")
+//        Bmob.initialize(this@MainActivity, "4374418a729ed75475eebf3028c7e233", "Direct")
         return true
     }
 
@@ -232,11 +218,18 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     }
 
     private fun saveAppLaunchToBmob() {
-        Log.d(LOG_TAG_PYF_GENERAL, "Saving installation to bmob")
-        val launchInfoBmobObj = AppLaunch.create(sharedPreferences)
-        launchInfoBmobObj.save { _, bmobException ->
-            bmobException?.let { Log.e(LOG_TAG_PYF_GENERAL, "Failed saving launch info", bmobException) }
-
+        Log.d(LOG_TAG_PYF_GENERAL, "Saving app launch to bmob")
+        sharedThreadPool.submit {
+            try {
+                createBmobPostRequest("AppLaunch", AppLaunch.create(sharedPreferences).toJsonString())
+                        .newCallWith(sharedOkHttpClient)
+                        .execute()
+                        .let { response ->
+                            Log.i(LOG_TAG_PYF_GENERAL, "Submit app launch complete. Return code: ${response.code()} (OK if 201)")
+                        }
+            } catch (e: Throwable) {
+                Log.e(LOG_TAG_PYF_GENERAL, "Failed to submit app launch:$e")
+            }
         }
     }
 
