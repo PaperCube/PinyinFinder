@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_title">你喜欢的人名字缩写是…</string>
+    <string name="app_name">你喜欢的人名字缩写是什么</string>
+    <string name="textMessage">......</string>
+    <string name="text_enter_what_you_want_to_search">搜索名字缩写、九键拼音的数字或班级</string>
+    <string name="text_about">
+        使用拼音来检索一中高一级部的所有人。
+        \n\n要提交漏洞反馈和建议、或者获取这个应用的源代码，请发送邮件到imzhy@hotmail.com (兼企鹅账户)
+        \n如果你有检索高二高三人员的需求，而你恰好又有名单，请发送邮件给我。
+        \n:P
+        \n\nBy PaperCube
+        \n\n应用使用了第三方类库JPinyin (https://github.com/stuxuhai/jpinyin)
+        \n\n按理来说你不应该把这个应用传给一中以外的人使用。由此带来的后果（包括但不限于法律层面的）应由使用者（传播者）承担。
+    </string>
+    <string name="how_to_use_dialog_title">如何使用？</string>
+    <string name="how_to_use_dialog_tutorial">
+        小红暗恋小明。一天，她首次公开透露她喜欢的人名字缩写是xm，但是人们并不知道xm是谁，因此，人们输入了xm，发现小明就是xm。
+        \n\n正常的搜索时，无论是一个字母（被看作拼音首字母），一个数字（被看作九键拼音的表示）还是这个字本身，都可以代表一个汉字。
+        例如李四中的“李”，无论你输入“李”，还是L，还是5，都算作他们匹配。所有多音字都被考虑在内，因此某些字的特殊读音会带来一些奇怪的结果（比如孙可以读作xun，四声）
+        \n特别地，如果你不知道某个字是什么，你可以输入一个星号“*”，它可以和一切字匹配。你还可以在内容的最后面加一个英文叹号(!)，它代表这个人的名字就这几个字，没有更多了。
+        这样你在输入ls!找李四时，李四光就不会出现在结果中。
+        \n姓名检索不支持中间匹配，意思是第一个字符只会和名字的第一个字比较，而与第二第三个无关。你还可以直接键入班级，但是很抱歉你不可以既指定姓名又指定班级。
+    </string>
+    <string name="text_confirm_ok">好的</string>
+    <string name="nothing">Nothing.</string>
+</resources>
