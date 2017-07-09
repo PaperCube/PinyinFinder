@@ -3,6 +3,6 @@
     <color name="colorPrimary">#f44336</color>
     <color name="colorPrimaryDark">#d32f2f</color>
     <color name="colorAccent">#536dfe</color>
-    <color name="colorError">#f44336</color>
-    <color name="colorTextDark">#000000</color>
+    <!--<color name="colorError">#f44336</color>-->
+    <!--<color name="colorTextDark">#000000</color>-->
 </resources>

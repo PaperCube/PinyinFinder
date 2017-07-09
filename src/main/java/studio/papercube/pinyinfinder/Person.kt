@@ -19,7 +19,8 @@ class Person {
         val chineseCharacterString = ChineseCharacterString(name)
         return chineseCharacterString.pinyinAbbreviationMatches(pattern, requireLengthMatch) ||
                 pattern in name ||
-                pattern in from
+                pattern in from ||
+                chineseCharacterString.fullPinyinMatches(pattern, requireLengthMatch = requireLengthMatch)
     }
 
     override fun toString(): String {

@@ -14,7 +14,7 @@ class Update {
     val message: String
         get() {
             val latestVersionCode = getLatestVersionCode()
-            return versions.filter { it.versionCode > Updator.currentVersionCode && it.versionCode <= latestVersionCode }
+            return versions.filter { it.versionCode > Updater.currentVersionCode && it.versionCode <= latestVersionCode }
                     .sortedByDescending { it.versionCode }
                     .joinToString(separator = "\n", transform = Version::mergeMessages)
         }
@@ -41,7 +41,7 @@ class Update {
      */
     fun hasLaterVersion(): Boolean {
         return try {
-            getLatestVersionCode() > Updator.currentVersionCode
+            getLatestVersionCode() > Updater.currentVersionCode
         } catch (e: Throwable) {
             false
         }

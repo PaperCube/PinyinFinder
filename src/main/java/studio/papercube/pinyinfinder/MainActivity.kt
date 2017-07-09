@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -29,12 +31,16 @@ import studio.papercube.pinyinfinder.datatransfer.AppLaunch
 import studio.papercube.pinyinfinder.datatransfer.createBmobPostRequest
 import studio.papercube.pinyinfinder.datatransfer.newCallWith
 import studio.papercube.pinyinfinder.datatransfer.sharedOkHttpClient
+import studio.papercube.pinyinfinder.graphics.Colors
 import studio.papercube.pinyinfinder.localcommand.Command
 import studio.papercube.pinyinfinder.update.GitRemoteAccess
 import studio.papercube.pinyinfinder.update.Update
 import studio.papercube.pinyinfinder.update.UpdateFailure
 import studio.papercube.pinyinfinder.update.UpdateFailure.CausedBy.*
-import studio.papercube.pinyinfinder.update.Updator
+import studio.papercube.pinyinfinder.update.Updater
+import studio.papercube.pinyinfinder.widgets.SingleDialogManager
+import studio.papercube.pinyinfinder.widgets.autoHidden
+import studio.papercube.pinyinfinder.widgets.lineAppendedIf
 
 /**
  * 应用程序的主界面。第一个活动
@@ -86,7 +92,9 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      */
     private val updateDialogMgr: SingleDialogManager = SingleDialogManager()
 
-    private lateinit var additionalTextMgr: AutoFitTextViewManager
+    private lateinit var additionalText: TextView
+
+    private var isInternalDataSetExpired = false
 
     /**
      * 异步处理器。这个处理器是用来加载符合条件的姓名的。
@@ -94,8 +102,9 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     @SuppressLint("SetTextI18n")
     private val processor = Processor { data: String ->
         val resultList = if (data.isEmpty()) PersonList() else persons.filterByShortPinyin(data).sortByNameLength() //如果要处理的缩写是空字符串，那么直接返回空列表
+        val result = resultList.apply { currentResult = this }.toStringList() //先把结果赋值给一个变量，然后再把这个结果转换成一个字符串列表以供显示
 
-        resultList.apply { currentResult = this }.toStringList() //先把结果赋值给一个变量，然后再把这个结果转换成一个字符串列表以供显示
+        result
     }.then { filteredResult ->
         runOnUiThread {
             val adapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, filteredResult) //使用结果来创建一个适用于显示的列表适配器
@@ -125,17 +134,17 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         listView = findViewById(R.id.listResults) as ListView
         textInfo = findViewById(R.id.textInfo) as TextView
         topView = findViewById(R.id.topView)
-        additionalTextMgr = AutoFitTextViewManager(findViewById(R.id.additionalText) as TextView)
-        additionalTextMgr.setColor(R.color.colorError)
+//        additionalTextMgr = AutoFitTextViewManager(findViewById(R.id.additionalText) as TextView)
+        additionalText = findViewById(R.id.additionalText) as TextView
 
         sharedPreferences = getSharedPreferences("AppConfig", Context.MODE_PRIVATE)
 
-        Updator.currentVersionCode = packageManager.getPackageInfo(packageName, 0).versionCode //指定当前应用的版本号
-        Updator.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本号
+        Updater.currentVersionCode = packageManager.getPackageInfo(packageName, 0).versionCode //指定当前应用的版本号
+        Updater.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本号
 
         createProgressDialog("正在加载数据") {
             loadPreferredData()
-            if (InternalDataSets.hasExpired()) additionalTextMgr.append("数据已过期。这是${InternalDataSets.targetYear}年的。")
+            if (InternalDataSets.hasExpired()) isInternalDataSetExpired = true
             editTextSearch.addTextChangedListener(AfterTextChangedListener { onTextChanged(it.trim()) }) //为输入框指定文字改变时的监听器
 
             listView.setOnItemLongClickListener { _, _, position, _ ->
@@ -147,12 +156,12 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
                 val lastAppVersion = sharedPreferences.getInt("appVersion", -1)
                 if (lastAppVersion == -1) {//如果首次运行
                     onFirstRun()
-                } else if (lastAppVersion != Updator.currentVersionCode) {
+                } else if (lastAppVersion != Updater.currentVersionCode) {
                     onFirstRunAfterUpdate()
                 }
 
                 sharedPreferences.edit()
-                        .putInt("appVersion", Updator.currentVersionCode)
+                        .putInt("appVersion", Updater.currentVersionCode)
                         .apply()
             } catch (ignored: Throwable) { //忽略一切异常
             }
@@ -163,13 +172,13 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 
         try {
             if (sharedPreferences.getBoolean("autoCheckForUpdate", true)) { //如果允许自动检查更新
-                Updator.updateHost = try {
+                Updater.updateHost = try {
                     GitRemoteAccess.Host.valueOf(sharedPreferences.getString("updateHost", "UNKNOWN")) //指定远程服务器。默认是GITHUB
                 } catch (e: Throwable) {
                     GitRemoteAccess.Host.GITHUB //有任何错误（极其极其不正常的情况下出现GITHUB不存在）则指定GITHUB
                 }
 
-                Updator.whenUpdateFound { update -> runOnUiThread { update.buildDialog() } } //如果有更新，那么就提示
+                Updater.whenUpdateFound { update -> runOnUiThread { update.buildDialog() } } //如果有更新，那么就提示
             }
         } catch (e: Throwable) {
             e.printStackTrace()
@@ -192,11 +201,6 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 //                }
 //            }
 //        }
-    }
-
-    private fun initBmob(): Boolean {
-//        Bmob.initialize(this@MainActivity, "4374418a729ed75475eebf3028c7e233", "Direct")
-        return true
     }
 
     /**
@@ -290,11 +294,6 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     val COMMAND_SUFFIX = "*#"
 
     /**
-     * @see [onTextChanged]
-     */
-    private var invalidClassSearch: AutoFitTextViewManager.StringElementRef? = null
-
-    /**
      * 搜索框的文字被改变时触发。
      * @param text 新的文字。
      */
@@ -308,17 +307,19 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
                 textInfo.text = "命令模式。输入*#来闭合命令" //命令还没闭合
             }
         } else {
-            publish(trimmed) //如果不是命令，那么就是要搜索的东西。
-            if ((text.toIntOrNull() ?: 0) in 200..220) {
-                if (invalidClassSearch == null) {
-                    invalidClassSearch = additionalTextMgr.append("没有高二级部的班级信息")
-                }
-            } else {
-                invalidClassSearch?.let {
-                    additionalTextMgr.remove(it)
-                    invalidClassSearch = null
-                }
-            }
+            searchFor(trimmed) //如果不是命令，那么就是要搜索的东西。
+
+            SpannableStringBuilder()
+                    .lineAppendedIf("没有高二级部的班级信息", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 200..220 }
+                    .lineAppendedIf("使用全拼检索时，相邻汉字的拼音之间请用空格分隔", ForegroundColorSpan(Colors.colorAccent)) {
+                        text.split(FilterPolicy.fullPinyinSeparator).any { it.length > 6 }
+                    }
+                    .lineAppendedIf("数据已过期。这是${InternalDataSets.targetYear}-${InternalDataSets.targetYear+1}学年的。",
+                            ForegroundColorSpan(Colors.colorError)) { isInternalDataSetExpired }
+                    .let {
+                        additionalText.text = it
+                        additionalText.autoHidden()
+                    }
         }
     }
 
@@ -333,12 +334,13 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         val parameters = command.parameters
         var commandExecuted = true
 
+        @Suppress("CanBeVal")
         var longSnackBar = false
         val resultMessage: String? = when (command.name) {
             "update-source" -> {
                 try {
                     val updateHost = GitRemoteAccess.Host.valueOf(parameters[0])
-                    Updator.updateHost = updateHost
+                    Updater.updateHost = updateHost
                     sharedPreferences.edit()
                             .putString("updateHost", updateHost.name)
                             .apply()
@@ -368,9 +370,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      * @param text 要搜索的文字
      */
     @SuppressLint("SetTextI18n") //抑制String Resource警告
-    private fun publish(text: String) {
+    private fun searchFor(text: String) {
         textInfo.text = "正在加载"
-
         processor.process(text)
     }
 
@@ -422,7 +423,7 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 
         createProgressDialog("正在检查更新", cancellable = true) {
             try {
-                val update = Updator.checkForUpdate()
+                val update = Updater.checkForUpdate()
                 if (update.hasLaterVersion()) runOnUiThread { update.buildDialog() }
                 else runOnUiThread { topView.createSnackBar("没有更新的版本") }
             } catch (e: UpdateFailure) {
@@ -596,6 +597,7 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     private fun safeForceRefreshResults() {
         runOnUiThread { onTextChanged(editTextSearch.text.toString()) } //更新结果。
     }
+
 }
 
 

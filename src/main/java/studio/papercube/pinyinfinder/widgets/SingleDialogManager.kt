@@ -1,4 +1,4 @@
-package studio.papercube.pinyinfinder
+package studio.papercube.pinyinfinder.widgets
 
 import android.content.Context
 import android.support.v7.app.AlertDialog
@@ -12,7 +12,7 @@ class SingleDialogManager @RunnableOnAnyThread constructor(){
     /**
      * 当前正在显示的对话框
      */
-    private var currentDialog:AlertDialog? = null
+    private var currentDialog: AlertDialog? = null
 
     /**
      * 显示一个对话框。它会先把上一个对话框（如果有）关掉，然后再显示现在的。必须在UI线程上运行

@@ -8,7 +8,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.charset.Charset
 
-object Updator {
+object Updater {
     var currentVersionCode: Int = 0
     var currentVersionName: String = "UNINITIALIZED"
 

@@ -18,7 +18,7 @@ open class ChineseCharacterString(val value: String) {
                         firstLetterToSearch isRepresentationInT9Of value[index])
                     continue
 
-                if(firstLetterToSearch !in 'a'..'z') return false
+                if (firstLetterToSearch !in 'a'..'z') return false
 
                 for (possiblePinyin in value[index].toPinyinArray(PinyinFormat.WITHOUT_TONE)) {
                     if (firstLetterToSearch == possiblePinyin[0]) continue@shortPinyinLoop
@@ -33,16 +33,37 @@ open class ChineseCharacterString(val value: String) {
         }
     }
 
+    fun fullPinyinMatches(fullPinyin: String,
+                          allowMiddleSearch: Boolean = false,
+                          separator: String = FilterPolicy.fullPinyinSeparator,
+                          requireLengthMatch: Boolean): Boolean {
+        val fullPinyinParts = fullPinyin.toLowerCase().split(separator)
+        val partSize = fullPinyinParts.size
+        return if (partSize > value.length)
+            false
+        else
+            fullPinyinParts.withIndex().all { (index, part) ->
+                value[index].toPinyinArray(PinyinFormat.WITHOUT_TONE).any {
+                    when {
+                        allowMiddleSearch -> part in it
+                        part == "*" -> true
+                        index < partSize - 1 -> part == it
+                        else -> it.startsWith(part)
+                    }
+                }
+            } && (!requireLengthMatch || partSize == value.length)
+    }
+
     private val ZERO_IN_CHAR = '0'.toInt()
-    private infix fun Char.isRepresentationInT9Of(chineseCharacter: Char):Boolean{
+    private infix fun Char.isRepresentationInT9Of(chineseCharacter: Char): Boolean {
         return this.toInt() - ZERO_IN_CHAR isRepresentationInT9Of chineseCharacter
     }
 
     private infix fun Int.isRepresentationInT9Of(chineseCharacter: Char): Boolean {
         if (this in 2..9) {
             val expectedFirstLetters = t9Map[this]
-            val foundFirstLetters = chineseCharacter.toPinyinArray().map{it.first().toLowerCase()}
-            return expectedFirstLetters.any{ it in foundFirstLetters}
+            val foundFirstLetters = chineseCharacter.toPinyinArray().map { it.first().toLowerCase() }
+            return expectedFirstLetters.any { it in foundFirstLetters }
         } else return false
     }
 
@@ -51,4 +72,10 @@ open class ChineseCharacterString(val value: String) {
     private inline fun Char.toPinyinArray(pinyinFormat: PinyinFormat = PinyinFormat.WITH_TONE_MARK) = PinyinHelper.convertToPinyinArray(this, pinyinFormat)
 
     override fun toString() = value
+}
+
+class FilterPolicy {
+    companion object {
+        @JvmStatic val fullPinyinSeparator = " "
+    }
 }

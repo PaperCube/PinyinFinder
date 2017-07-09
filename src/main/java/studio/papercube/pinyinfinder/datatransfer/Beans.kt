@@ -3,7 +3,7 @@ package studio.papercube.pinyinfinder.datatransfer
 import android.content.SharedPreferences
 import android.os.Build
 import studio.papercube.pinyinfinder.content.BeanObject
-import studio.papercube.pinyinfinder.update.Updator
+import studio.papercube.pinyinfinder.update.Updater
 import java.util.*
 
 
@@ -33,7 +33,7 @@ class AppLaunch private constructor() : BeanObject<AppLaunch>() {
             installationId = getInstallationId(pref)
             deviceModel = Build.MODEL
             androidVersion = Build.VERSION.SDK_INT.toString()
-            appVersion = Updator.currentVersionName
+            appVersion = Updater.currentVersionName
             additionalInfo = ""
 
             val launchCountReadFromPref = pref.getString("AppLaunchCount", "1").toLongOrNull() ?: 1
