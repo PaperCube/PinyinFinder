@@ -101,9 +101,21 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      */
     @SuppressLint("SetTextI18n")
     private val processor = Processor { data: String ->
-        val resultList = if (data.isEmpty()) PersonList() else persons.filterByShortPinyin(data).sortByNameLength() //如果要处理的缩写是空字符串，那么直接返回空列表
-        val result = resultList.apply { currentResult = this }.toStringList() //先把结果赋值给一个变量，然后再把这个结果转换成一个字符串列表以供显示
+        val resultListUnsorted: List<Person> = when {
+            data.isEmpty() -> PersonList() //如果要处理的缩写是空字符串，那么直接返回空列表
+            data.startsWith("原") -> {
+                val givenOriginalClassLiteral = data.substring(1).toIntOrNull()
+                //TODO COMPATIBILITY WARNING: data set may change. Be aware of these year- and data-set-specific codes.
+                if (givenOriginalClassLiteral == null || givenOriginalClassLiteral !in 100..199) null
+                else persons.filter { it.originalClass != null && it.originalClass?.toIntOrNull() == givenOriginalClassLiteral - 100 }
+            }
+            else -> null
+        } ?: persons.filterByShortPinyin(data)
 
+        val result = resultListUnsorted
+                .sortedByNameLength()
+                .apply { currentResult = this }
+                .toStringList() //先把结果赋值给一个变量，然后再把这个结果转换成一个字符串列表以供显示
         result
     }.then { filteredResult ->
         runOnUiThread {
@@ -309,12 +321,14 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         } else {
             searchFor(trimmed) //如果不是命令，那么就是要搜索的东西。
 
+            //TODO WARNING AND IMPROVEMENTS: SWAP LAMBDA AND OTHER ARGS. DataSet situation may change in the future. Be aware of these data-set specific codes.
             SpannableStringBuilder()
-                    .lineAppendedIf("没有高二级部的班级信息", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 200..220 }
+                    .lineAppendedIf("抱歉，还没有高一级部的名单", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 100..120 }
+                    .lineAppendedIf("没有高三级部的班级信息", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 300..320 }
                     .lineAppendedIf("使用全拼检索时，相邻汉字的拼音之间请用空格分隔", ForegroundColorSpan(Colors.colorAccent)) {
                         text.split(FilterPolicy.fullPinyinSeparator).any { it.length > 6 }
                     }
-                    .lineAppendedIf("数据已过期。这是${InternalDataSets.targetYear}-${InternalDataSets.targetYear+1}学年的。",
+                    .lineAppendedIf("数据已过期。这是${InternalDataSets.TARGET_YEAR}-${InternalDataSets.TARGET_YEAR + 1}学年的。",
                             ForegroundColorSpan(Colors.colorError)) { isInternalDataSetExpired }
                     .let {
                         additionalText.text = it

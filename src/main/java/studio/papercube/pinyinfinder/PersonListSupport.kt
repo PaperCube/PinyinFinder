@@ -14,6 +14,6 @@ fun List<Person>.filterByShortPinyin(shortPinyin: String): List<Person> {
     }
 }
 
-fun List<Person>.sortByNameLength(): List<Person> {
+fun List<Person>.sortedByNameLength(): List<Person> {
     return sortedBy { it.name.length }
 }

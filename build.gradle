@@ -11,13 +11,13 @@ android {
         }
     }
     compileSdkVersion 24
-    buildToolsVersion "24.0.0"
+    buildToolsVersion '25.0.0'
     defaultConfig {
         applicationId "studio.papercube.pinyinfinder.android"
         minSdkVersion 15
         targetSdkVersion 24
-        versionCode 31
-        versionName "17.07.1"
+        versionCode 35
+        versionName "17.09"
 //        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
