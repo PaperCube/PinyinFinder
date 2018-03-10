@@ -4,7 +4,6 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
-import studio.papercube.pinyinfinder.BmobKeys
 
 private fun String.toJsonRequestBody():RequestBody = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), this)
 fun String.bmobTableNameToURL() = "https://api.bmob.cn/1/classes/$this"

@@ -1,4 +1,4 @@
-package studio.papercube.pinyinfinder;
+package studio.papercube.pinyinfinder.datatransfer;
 
 public class BmobKeys {
     public static final String APPLICATION_ID = "4374418a729ed75475eebf3028c7e233";

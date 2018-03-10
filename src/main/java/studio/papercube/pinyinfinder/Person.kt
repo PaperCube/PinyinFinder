@@ -1,9 +1,12 @@
 package studio.papercube.pinyinfinder
 
+import studio.papercube.pinyinfinder.PinyinMatchResult.Companion.FLAG_MATCH_IN_CLASS
+import studio.papercube.pinyinfinder.PinyinMatchResult.Companion.FLAG_MATCH_IN_NAME
+
 class Person {
     val from: String
     val name: String
-    var originalClass:String? = null
+    var originalClass: String? = null
 
     constructor(rawText: String) {
         val elements = rawText.split(",")
@@ -25,9 +28,29 @@ class Person {
                 chineseCharacterString.fullPinyinMatches(pattern, requireLengthMatch = requireLengthMatch)
     }
 
+    fun tryMatch(pattern: String, requireLengthMatch: Boolean = false): PersonMatch {
+        val chineseCharacterString = ChineseCharacterString(name)
+        val pinyinMatchResult = chineseCharacterString.matchPinyinAbbreviation(pattern, requireLengthMatch)?.sourceFlag(FLAG_MATCH_IN_NAME)
+                ?: pattern.checkTextOccurrenceIn(name)?.sourceFlag(FLAG_MATCH_IN_NAME)
+                ?: pattern.checkTextOccurrenceIn(from)?.sourceFlag(FLAG_MATCH_IN_CLASS)
+                ?: chineseCharacterString.matchFullPinyin(pattern, requireLengthMatch = requireLengthMatch)?.sourceFlag(FLAG_MATCH_IN_NAME)
+
+        return PersonMatch(this, pinyinMatchResult)
+    }
+
+    private fun String.checkTextOccurrenceIn(text: String): FlagMutablePinyinMatchResult? {
+        val index = text.indexOf(this)
+        return if (index == -1) null
+        else StandardPinyinMatchResult(index, index + length, text)
+    }
+
+    private fun FlagMutablePinyinMatchResult.sourceFlag(flag: Long) = apply {
+        flagSource = flag
+    }
+
     override fun toString(): String {
         @Suppress("RemoveCurlyBracesFromTemplate")
-        return if(originalClass == null) "$name, $from"
+        return if (originalClass.isNullOrBlank()) "$name, $from"
         else "$name, $from (原${originalClass}班)"
     }
 }

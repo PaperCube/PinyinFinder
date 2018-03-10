@@ -2,6 +2,7 @@ package studio.papercube.pinyinfinder.datatransfer
 
 import android.content.SharedPreferences
 import android.os.Build
+import com.google.gson.annotations.Expose
 import studio.papercube.pinyinfinder.content.BeanObject
 import studio.papercube.pinyinfinder.update.Updater
 import java.util.*
@@ -10,26 +11,30 @@ import java.util.*
 @Suppress("unused")
 class AppLaunch private constructor() : BeanObject<AppLaunch>() {
     companion object {
-        @JvmStatic fun getInstallationId(pref: SharedPreferences): String {
+        @JvmStatic
+        fun getInstallationId(pref: SharedPreferences): String {
             val id = pref.getString("installationId", "Unknown")
             return if (id == "Unknown") {
                 allocateNewId(pref)
             } else id
         }
 
-        @JvmStatic fun setInstallationId(pref: SharedPreferences, id: String) {
+        @JvmStatic
+        fun setInstallationId(pref: SharedPreferences, id: String) {
             pref.edit()
                     .putString("installationId", id)
                     .apply()
         }
 
-        @JvmStatic fun allocateNewId(pref: SharedPreferences): String {
+        @JvmStatic
+        fun allocateNewId(pref: SharedPreferences): String {
             val id = Random().nextLong().toString()
             setInstallationId(pref, id)
             return id
         }
 
-        @JvmStatic fun create(pref: SharedPreferences): AppLaunch = AppLaunch().apply {
+        @JvmStatic
+        fun create(pref: SharedPreferences): AppLaunch = AppLaunch().apply {
             installationId = getInstallationId(pref)
             deviceModel = Build.MODEL
             androidVersion = Build.VERSION.SDK_INT.toString()
@@ -51,5 +56,12 @@ class AppLaunch private constructor() : BeanObject<AppLaunch>() {
     var additionalInfo: String? = null
     var timeStamp: Long? = System.currentTimeMillis()
     var launchCount: Long? = 0
+}
+
+@Suppress("unused")
+class Feedback(val text: String,
+               configPref:SharedPreferences
+) : BeanObject<Feedback>() {
+    val installationId: String = AppLaunch.getInstallationId(configPref)
 }
 

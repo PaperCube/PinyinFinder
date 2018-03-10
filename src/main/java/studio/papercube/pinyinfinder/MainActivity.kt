@@ -2,20 +2,22 @@ package studio.papercube.pinyinfinder
 
 import android.annotation.SuppressLint
 import android.content.*
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
+import android.support.v7.widget.LinearLayoutManager
+import android.support.v7.widget.RecyclerView
 import android.text.SpannableStringBuilder
+import android.text.method.LinkMovementMethod
 import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.ListView
 import android.widget.TextView
 import studio.papercube.pinyinfinder.annotations.LongOperationAgainstUIThread
 import studio.papercube.pinyinfinder.annotations.RunOnCurrentThread
@@ -38,14 +40,15 @@ import studio.papercube.pinyinfinder.update.Update
 import studio.papercube.pinyinfinder.update.UpdateFailure
 import studio.papercube.pinyinfinder.update.UpdateFailure.CausedBy.*
 import studio.papercube.pinyinfinder.update.Updater
-import studio.papercube.pinyinfinder.widgets.SingleDialogManager
-import studio.papercube.pinyinfinder.widgets.autoHidden
-import studio.papercube.pinyinfinder.widgets.lineAppendedIf
+import studio.papercube.pinyinfinder.widgets.*
 
 /**
  * 应用程序的主界面。第一个活动
  */
 class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsResultCallback {
+    companion object {
+        const val REQUEST_START_FEEDBACK_ACTIVITY = 1
+    }
 
     /**
      * 应用主界面的搜索框。对应[R.id.editTextSearch]。在[onCreate]方法中载入
@@ -55,7 +58,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     /**
      * 搜索的结果在这里显示
      */
-    private lateinit var listView: ListView
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var recyclerViewAdapter: NamesRecyclerViewAdapter
 
     /**
      * 提示语。位于搜索框下面，结果列表的上面。
@@ -75,12 +79,14 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     /**
      * 当前已经选择的数据集合（名单）。随着[loadData]的调用而更改。
      */
-    @Volatile private var selectedDataSets: List<DataSet>? = null
+    @Volatile
+    private var selectedDataSets: List<DataSet>? = null
 
     /**
      * 当前结果. 在Processor的第一次处理阶段被赋值
      */
-    @Volatile private var currentResult: List<Person>? = null
+    @Volatile
+    private var currentResult: List<PersonMatch>? = null
 
     /**
      * 公共设置
@@ -100,32 +106,29 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      * 异步处理器。这个处理器是用来加载符合条件的姓名的。
      */
     @SuppressLint("SetTextI18n")
-    private val processor = Processor { data: String ->
-        val resultListUnsorted: List<Person> = when {
-            data.isEmpty() -> PersonList() //如果要处理的缩写是空字符串，那么直接返回空列表
-            data.startsWith("原") -> {
-                val givenOriginalClassLiteral = data.substring(1).toIntOrNull()
-                //TODO COMPATIBILITY WARNING: data set may change. Be aware of these year- and data-set-specific codes.
-                if (givenOriginalClassLiteral == null || givenOriginalClassLiteral !in 100..199) null
-                else persons.filter { it.originalClass != null && it.originalClass?.toIntOrNull() == givenOriginalClassLiteral - 100 }
-            }
+    private val processor = Processor { inputText: String ->
+        val resultListUnsorted: List<PersonMatch> = when {
+            inputText.isEmpty() -> emptyList() //如果要处理的缩写是空字符串，那么直接返回空列表
+            inputText.startsWith("原") -> persons.matchByPreviousClass(inputText)
             else -> null
-        } ?: persons.filterByShortPinyin(data)
+        } ?: persons.matchByShortPinyin(inputText)
+
 
         val result = resultListUnsorted
-                .sortedByNameLength()
+                .sortedBy { it.person.name.length }
                 .apply { currentResult = this }
-                .toStringList() //先把结果赋值给一个变量，然后再把这个结果转换成一个字符串列表以供显示
         result
     }.then { filteredResult ->
         runOnUiThread {
-            val adapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, filteredResult) //使用结果来创建一个适用于显示的列表适配器
-            listView.adapter = adapter
-
+            recyclerViewAdapter.commitData(filteredResult)
             val selectedDataSetsCount = selectedDataSets?.size //已经选择的数据集合（名单）的数量。null代表名单还没有初始化。正常情况下它不应该是null
             textInfo.text = when {
                 selectedDataSetsCount != 0 -> "在${selectedDataSetsCount ?: "?"}个名单中找到${filteredResult.size}条数据"
-                else -> "你没有选择任何名单。在 选项菜单 | 选择要查看的数据 中更改设置。"
+                else -> SpannableStringBuilder()
+                        .append("你没有选择任何名单。")
+                        .appendSpan("更改设置", TextClickableSpan(this@MainActivity).setOnClick {
+                            showDataSelector()
+                        })
             }
         }
     }.startThread()
@@ -140,11 +143,19 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         //LATE-INIT VAR INITIALIZATIONS
+        recyclerView = findViewById(R.id.listResults) as RecyclerView
+        recyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        recyclerViewAdapter = NamesRecyclerViewAdapter(this)
+        recyclerView.adapter = recyclerViewAdapter
+        recyclerView.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
+
         editTextSearch = findViewById(R.id.editTextSearch) as EditText
-        listView = findViewById(R.id.listResults) as ListView
+        recyclerView = findViewById(R.id.listResults) as RecyclerView
         textInfo = findViewById(R.id.textInfo) as TextView
+        textInfo.movementMethod = LinkMovementMethod.getInstance() //???
         topView = findViewById(R.id.topView)
 //        additionalTextMgr = AutoFitTextViewManager(findViewById(R.id.additionalText) as TextView)
         additionalText = findViewById(R.id.additionalText) as TextView
@@ -152,16 +163,16 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         sharedPreferences = getSharedPreferences("AppConfig", Context.MODE_PRIVATE)
 
         Updater.currentVersionCode = packageManager.getPackageInfo(packageName, 0).versionCode //指定当前应用的版本号
-        Updater.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本号
+        Updater.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本
 
         createProgressDialog("正在加载数据") {
             loadPreferredData()
             if (InternalDataSets.hasExpired()) isInternalDataSetExpired = true
             editTextSearch.addTextChangedListener(AfterTextChangedListener { onTextChanged(it.trim()) }) //为输入框指定文字改变时的监听器
 
-            listView.setOnItemLongClickListener { _, _, position, _ ->
+            recyclerViewAdapter.onItemLongClickListener = { personMatch ->
                 //为列表指定长按监听器。
-                onLongPressItem(position)
+                onLongPressItem(personMatch)
             }
 
             try {
@@ -198,21 +209,7 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-//        when (requestCode) {
-//            REQUEST_READ_PHONE_STATE -> {
-//                permissionLock.withLock {
-//                    grantResults.firstOrNull()?.takeIf { it == PackageManager.PERMISSION_GRANTED }?.run {
-//                        Log.i(LOG_TAG_PYF_GENERAL, "Permission: Read phone state: granted.")
-//                    } ?: run {
-//                        Toast.makeText(this, "读取设备识别码权限被拒绝。一些功能可能无法正常运行。", Toast.LENGTH_SHORT)
-//                                .show()
-//                        Log.i(LOG_TAG_PYF_GENERAL, "Access Denied: Read phone state.")
-//                    }
-//
-//                    bmobPermissionGrantingCondition.signalAll()
-//                }
-//            }
-//        }
+        //impl removed
     }
 
     /**
@@ -255,11 +252,13 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      * @param position 搜索结果索引
      */
     private fun onLongPressItem(position: Int): Boolean {
+        return currentResult?.let { return onLongPressItem(it[position]) } ?: false
+    }
+
+    private fun onLongPressItem(item: PersonMatch): Boolean {
         try {
-            currentResult?.run {
-                this[position].name.copyToClipboard()
-                topView.createSnackBar("已复制到剪贴板")
-            }
+            item.person.name.copyToClipboard()
+            topView.createSnackBar("已复制到剪贴板")
         } catch (e: Exception) {
             topView.createSnackBar("无法复制这个内容:$e")
             return false
@@ -282,11 +281,27 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
             R.id.menu_select_data_set -> showDataSelector()
 
         //复制选项
-            R.id.menu_copy_all_names -> currentResult.joinToStringOrNullWhenEmpty(separator = "，") { it.name }.copyOrNotify()
-            R.id.menu_copy_all_names_with_classes -> currentResult.joinToStringOrNullWhenEmpty(separator = "，") { "${it.from}班${it.name}" }.copyOrNotify()
+            R.id.menu_copy_all_names -> currentResult.joinToStringOrNullWhenEmpty(separator = "，") { it.person.name }.copyOrNotify()
+            R.id.menu_copy_all_names_with_classes -> currentResult.joinToStringOrNullWhenEmpty(separator = "，") { "${it.person.from}班${it.person.name}" }.copyOrNotify()
+            R.id.menu_item_send_feedback -> startActivityForResult(
+                    Intent(this, FeedbackActivity::class.java),
+                    REQUEST_START_FEEDBACK_ACTIVITY
+            )
         }
         return super.onOptionsItemSelected(item)
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_START_FEEDBACK_ACTIVITY -> when (resultCode) {
+                FeedbackActivity.RESULT_CODE_SUCCESS->{
+                    topView.createSnackBar("已发送")
+                }
+            }
+        }
+    }
+
 
     /**
      * 主界面加载的过程中，加载到选项菜单时触发。这时指定要应用哪个菜单。
@@ -323,13 +338,18 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 
             //TODO WARNING AND IMPROVEMENTS: SWAP LAMBDA AND OTHER ARGS. DataSet situation may change in the future. Be aware of these data-set specific codes.
             SpannableStringBuilder()
-                    .lineAppendedIf("抱歉，还没有高一级部的名单", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 100..120 }
-                    .lineAppendedIf("没有高三级部的班级信息", ForegroundColorSpan(Colors.colorError)) { (text.toIntOrNull() ?: 0) in 300..320 }
-                    .lineAppendedIf("使用全拼检索时，相邻汉字的拼音之间请用空格分隔", ForegroundColorSpan(Colors.colorAccent)) {
-                        text.split(FilterPolicy.fullPinyinSeparator).any { it.length > 6 }
+                    .lineAppendedIf((text.toIntOrNull() ?: 0) in 100..120, ForegroundColorSpan(Colors.colorError)) {
+                        "抱歉，还没有高一级部的名单"
                     }
-                    .lineAppendedIf("数据已过期。这是${InternalDataSets.TARGET_YEAR}-${InternalDataSets.TARGET_YEAR + 1}学年的。",
-                            ForegroundColorSpan(Colors.colorError)) { isInternalDataSetExpired }
+                    .lineAppendedIf((text.toIntOrNull() ?: 0) in 300..320, ForegroundColorSpan(Colors.colorError)) {
+                        "没有高三级部的班级信息"
+                    }
+                    .lineAppendedIf(text.split(FilterPolicy.fullPinyinSeparator).any { it.length > 6 }, ForegroundColorSpan(Colors.colorAccent)) {
+                        "使用全拼检索时，相邻汉字的拼音之间请用空格分隔"
+                    }
+                    .lineAppendedIf(isInternalDataSetExpired, ForegroundColorSpan(Colors.colorError)) {
+                        "数据已过期。这是${InternalDataSets.TARGET_YEAR}-${InternalDataSets.TARGET_YEAR + 1}学年的。"
+                    }
                     .let {
                         additionalText.text = it
                         additionalText.autoHidden()
@@ -393,7 +413,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
      * 加载一个数据集合列表。
      * @param dataSetToLoad 要加载的数据集合列表
      */
-    @LongOperationAgainstUIThread @RunnableOnAnyThread
+    @LongOperationAgainstUIThread
+    @RunnableOnAnyThread
     private fun loadData(dataSetToLoad: List<DataSet>) {
         persons = MultiSourceDataLoader.load(dataSetToLoad)
         selectedDataSets = dataSetToLoad
@@ -408,7 +429,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
     /**
      * 先读取上次选择的集合列表，然后再用[loadData]加载它
      */
-    @LongOperationAgainstUIThread @RunnableOnAnyThread
+    @LongOperationAgainstUIThread
+    @RunnableOnAnyThread
     private fun loadPreferredData() {
         loadData(getStoredSelectedDataSetItems().toList())
     }

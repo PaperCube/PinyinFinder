@@ -3,46 +3,58 @@ package studio.papercube.pinyinfinder
 import com.github.stuxuhai.jpinyin.PinyinFormat
 import com.github.stuxuhai.jpinyin.PinyinHelper
 
-private val t9Map = "*/*/abc/def/ghi/jkl/mno/pqrs/tuv/wxyz".split("/")
-
 open class ChineseCharacterString(val value: String) {
-    fun pinyinAbbreviationMatches(shortPinyin: String, requireLengthMatch: Boolean = false): Boolean {
+
+    companion object {
+        private val T9_MAP = "*/*/abc/def/ghi/jkl/mno/pqrs/tuv/wxyz".split("/")
+        private const val INT_VALUE_OF_CHAR_ZERO = '0'.toInt()
+    }
+
+    fun matchPinyinAbbreviation(shortPinyin: String, requireLengthMatch: Boolean = false): FlagMutablePinyinMatchResult? {
         try {
-            if (shortPinyin.length > value.length) return false
+            if (shortPinyin.length > value.length) return null
 
-            val processed = shortPinyin.toLowerCase()
+            val lowerCase = shortPinyin.toLowerCase()
 
-            shortPinyinLoop@ for ((index, firstLetterToSearch) in processed.withIndex()) {
-                if (firstLetterToSearch == '*' ||
-                        firstLetterToSearch == value[index] ||
-                        firstLetterToSearch isRepresentationInT9Of value[index])
-                    continue
-
-                if (firstLetterToSearch !in 'a'..'z') return false
-
-                for (possiblePinyin in value[index].toPinyinArray(PinyinFormat.WITHOUT_TONE)) {
-                    if (firstLetterToSearch == possiblePinyin[0]) continue@shortPinyinLoop
+            shortPinyinLoop@ for ((index, firstLetterToSearch) in lowerCase.withIndex()) { //iterate over letters
+                if (firstLetterToSearch == '*' || //if is wildcard
+                        firstLetterToSearch == value[index] || // if it is itself the same character in corresponding place
+                        firstLetterToSearch isRepresentationInT9Of value[index]) { //if number matches
+                    continue //search for next letter
                 }
 
-                return false
+                if (firstLetterToSearch !in 'a'..'z') return null //if fails to meet all requirements, stop.
+
+                @Suppress("LoopToCallChain") //the advice suggested by the warning can't be accepted.
+                for (possiblePinyin in value[index].toPinyinArray(PinyinFormat.WITHOUT_TONE)) { // iterate over possible pinyin of that chinese character
+                    if (firstLetterToSearch == possiblePinyin[0]) continue@shortPinyinLoop // matching first
+                }
+
+                // nothing matches
+                return null
             }
 
-            return !requireLengthMatch || processed.length == value.length
-        } catch (e: Throwable) {
-            return false
+            return if (!requireLengthMatch || lowerCase.length == value.length) {
+                StandardPinyinMatchResult(0, shortPinyin.length, value)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            return null
         }
     }
 
-    fun fullPinyinMatches(fullPinyin: String,
-                          allowMiddleSearch: Boolean = false,
-                          separator: String = FilterPolicy.fullPinyinSeparator,
-                          requireLengthMatch: Boolean): Boolean {
+    fun matchFullPinyin(fullPinyin: String,
+                        allowMiddleSearch: Boolean = false,
+                        separator: String = FilterPolicy.fullPinyinSeparator,
+                        requireLengthMatch: Boolean): FlagMutablePinyinMatchResult? {
         val fullPinyinParts = fullPinyin.toLowerCase().split(separator)
         val partSize = fullPinyinParts.size
-        return if (partSize > value.length)
+        val acceptable = if (partSize > value.length)
             false
         else
             fullPinyinParts.withIndex().all { (index, part) ->
+                // iterate over all pinyin parts
                 value[index].toPinyinArray(PinyinFormat.WITHOUT_TONE).any {
                     when {
                         allowMiddleSearch -> part in it
@@ -52,19 +64,30 @@ open class ChineseCharacterString(val value: String) {
                     }
                 }
             } && (!requireLengthMatch || partSize == value.length)
+        return if (acceptable) StandardPinyinMatchResult(0, partSize, value) else null
     }
 
-    private val ZERO_IN_CHAR = '0'.toInt()
+    fun pinyinAbbreviationMatches(shortPinyin: String, requireLengthMatch: Boolean = false): Boolean {
+        return matchPinyinAbbreviation(shortPinyin, requireLengthMatch) != null
+    }
+
+    fun fullPinyinMatches(fullPinyin: String,
+                          allowMiddleSearch: Boolean = false,
+                          separator: String = FilterPolicy.fullPinyinSeparator,
+                          requireLengthMatch: Boolean): Boolean {
+        return matchFullPinyin(fullPinyin, allowMiddleSearch, separator, requireLengthMatch) != null
+    }
+
     private infix fun Char.isRepresentationInT9Of(chineseCharacter: Char): Boolean {
-        return this.toInt() - ZERO_IN_CHAR isRepresentationInT9Of chineseCharacter
+        return this.toInt() - INT_VALUE_OF_CHAR_ZERO isRepresentationInT9Of chineseCharacter
     }
 
     private infix fun Int.isRepresentationInT9Of(chineseCharacter: Char): Boolean {
-        if (this in 2..9) {
-            val expectedFirstLetters = t9Map[this]
+        return if (this in 2..9) {
+            val expectedFirstLetters = T9_MAP[this]
             val foundFirstLetters = chineseCharacter.toPinyinArray().map { it.first().toLowerCase() }
-            return expectedFirstLetters.any { it in foundFirstLetters }
-        } else return false
+            expectedFirstLetters.any { it in foundFirstLetters }
+        } else false
     }
 
 
@@ -76,6 +99,7 @@ open class ChineseCharacterString(val value: String) {
 
 class FilterPolicy {
     companion object {
-        @JvmStatic val fullPinyinSeparator = " "
+        @JvmStatic
+        val fullPinyinSeparator = " "
     }
 }

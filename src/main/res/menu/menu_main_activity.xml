@@ -13,6 +13,7 @@
           android:checkable="false"/>
     <item android:title="关于" android:id="@+id/menu_item_about" android:enabled="true" android:visible="true"
           android:checkable="false"/>
+    <item android:title="发送反馈" android:id="@+id/menu_item_send_feedback" android:enabled="true" android:visible="true"/>
     <item android:title="检查更新" android:id="@+id/menu_check_for_update" android:enabled="true" android:visible="true"
           android:checkable="false"/>
 </menu>
