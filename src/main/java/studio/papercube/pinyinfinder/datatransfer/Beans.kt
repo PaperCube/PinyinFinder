@@ -2,11 +2,24 @@ package studio.papercube.pinyinfinder.datatransfer
 
 import android.content.SharedPreferences
 import android.os.Build
-import com.google.gson.annotations.Expose
 import studio.papercube.pinyinfinder.content.BeanObject
+import studio.papercube.pinyinfinder.content.Hex
+import studio.papercube.pinyinfinder.time.FormattedTime
 import studio.papercube.pinyinfinder.update.Updater
 import java.util.*
 
+private object StaticDeviceInfo {
+    fun getDetailedAndroidVersion(): String {
+        val sdkInt = Build.VERSION.SDK_INT
+        val inc = Build.VERSION.INCREMENTAL
+        val fingerprint = Build.FINGERPRINT
+        return mapOf(
+                "SDK_INT" to sdkInt,
+                "INCREMENTAL" to inc,
+                "BUILD_FINGERPRINT" to fingerprint
+        ).toString()
+    }
+}
 
 @Suppress("unused")
 class AppLaunch private constructor() : BeanObject<AppLaunch>() {
@@ -28,7 +41,7 @@ class AppLaunch private constructor() : BeanObject<AppLaunch>() {
 
         @JvmStatic
         fun allocateNewId(pref: SharedPreferences): String {
-            val id = Random().nextLong().toString()
+            val id = Hex.toGroupedHexString(Random().nextLong())
             setInstallationId(pref, id)
             return id
         }
@@ -37,9 +50,13 @@ class AppLaunch private constructor() : BeanObject<AppLaunch>() {
         fun create(pref: SharedPreferences): AppLaunch = AppLaunch().apply {
             installationId = getInstallationId(pref)
             deviceModel = Build.MODEL
-            androidVersion = Build.VERSION.SDK_INT.toString()
+            androidVersion = StaticDeviceInfo.getDetailedAndroidVersion()
             appVersion = Updater.currentVersionName
-            additionalInfo = ""
+            time = try {
+                FormattedTime.getSimplyFormattedTime()
+            } catch (e: IllegalArgumentException) {
+                e.toString()
+            }
 
             val launchCountReadFromPref = pref.getString("AppLaunchCount", "1").toLongOrNull() ?: 1
             launchCount = launchCountReadFromPref
@@ -55,13 +72,16 @@ class AppLaunch private constructor() : BeanObject<AppLaunch>() {
     var appVersion: String? = null
     var additionalInfo: String? = null
     var timeStamp: Long? = System.currentTimeMillis()
+    var time: String? = null
     var launchCount: Long? = 0
 }
 
 @Suppress("unused")
 class Feedback(val text: String,
-               configPref:SharedPreferences
+               configPref: SharedPreferences
 ) : BeanObject<Feedback>() {
+    val androidVersion = StaticDeviceInfo.getDetailedAndroidVersion()
+    val time: String = FormattedTime.getSimplyFormattedTime()
     val installationId: String = AppLaunch.getInstallationId(configPref)
 }
 

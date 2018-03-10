@@ -25,6 +25,7 @@ import studio.papercube.pinyinfinder.annotations.RunnableOnAnyThread
 import studio.papercube.pinyinfinder.annotations.UiThreadRequired
 import studio.papercube.pinyinfinder.concurrent.Processor
 import studio.papercube.pinyinfinder.concurrent.sharedThreadPool
+import studio.papercube.pinyinfinder.content.Hex
 import studio.papercube.pinyinfinder.content.LOG_TAG_PYF_GENERAL
 import studio.papercube.pinyinfinder.dataloader.DataSet
 import studio.papercube.pinyinfinder.dataloader.InternalDataSets
@@ -238,9 +239,12 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
                         .newCallWith(sharedOkHttpClient)
                         .execute()
                         .let { response ->
-                            Log.i(LOG_TAG_PYF_GENERAL, "Submit app launch complete. Return code: ${response.code()} (OK if 201)")
+                            val code = response.code()
+                            if (code in 200..299) {
+                                Log.i(LOG_TAG_PYF_GENERAL, "Submit app launch complete. Return code: $code (OK if 201)")
+                            } else throw RuntimeException("Unexpected response code $code. Response: $response")
                         }
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
                 Log.e(LOG_TAG_PYF_GENERAL, "Failed to submit app launch:$e")
             }
         }
@@ -295,7 +299,7 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             REQUEST_START_FEEDBACK_ACTIVITY -> when (resultCode) {
-                FeedbackActivity.RESULT_CODE_SUCCESS->{
+                FeedbackActivity.RESULT_CODE_SUCCESS -> {
                     topView.createSnackBar("已发送")
                 }
             }
