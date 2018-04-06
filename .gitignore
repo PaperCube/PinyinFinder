@@ -1,3 +1,13 @@
+*.iml
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+.DS_Store
 /build
-/official-default.jks
-/official-default-keystore-desc.txt
+/captures
+.externalNativeBuild
+/app/official-default.jks
+/app/official-default-desc.txt
+/something
+/VERSION_HISTORY
