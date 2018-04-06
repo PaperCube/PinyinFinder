@@ -36,7 +36,7 @@ class NamesRecyclerViewAdapter(private val context: Context)
     }
 
     class PersonViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val root = itemView.findViewById(R.id.person_layout_root)
+        private val root = itemView.findViewById<View>(R.id.person_layout_root)
         private val textView = itemView.findViewById(R.id.text_person_name) as TextView
         private lateinit var personMatch: PersonMatch
 
