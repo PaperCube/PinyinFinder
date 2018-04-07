@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import studio.papercube.pinyinfinder.content.BeanObject
 import studio.papercube.pinyinfinder.content.Hex
+import studio.papercube.pinyinfinder.datatransfer.InstallationIdMgr.getInstallationId
 import studio.papercube.pinyinfinder.time.FormattedTime
 import studio.papercube.pinyinfinder.update.Updater
 import java.util.*
@@ -21,37 +22,40 @@ private object StaticDeviceInfo {
     }
 }
 
+object InstallationIdMgr {
+    @JvmStatic
+    fun getInstallationId(pref: SharedPreferences): String {
+        val id = pref.getString("installationId", "Unknown")
+        return if (id == "Unknown") {
+            allocateNewId(pref)
+        } else id
+    }
+
+    @JvmStatic
+    fun setInstallationId(pref: SharedPreferences, id: String) {
+        pref.edit()
+                .putString("installationId", id)
+                .apply()
+    }
+
+    @JvmStatic
+    fun allocateNewId(pref: SharedPreferences): String {
+        val id = Hex.toGroupedHexString(Random().nextLong())
+        setInstallationId(pref, id)
+        return id
+    }
+}
+
 @Suppress("unused")
 class AppLaunch private constructor() : BeanObject<AppLaunch>() {
     companion object {
-        @JvmStatic
-        fun getInstallationId(pref: SharedPreferences): String {
-            val id = pref.getString("installationId", "Unknown")
-            return if (id == "Unknown") {
-                allocateNewId(pref)
-            } else id
-        }
-
-        @JvmStatic
-        fun setInstallationId(pref: SharedPreferences, id: String) {
-            pref.edit()
-                    .putString("installationId", id)
-                    .apply()
-        }
-
-        @JvmStatic
-        fun allocateNewId(pref: SharedPreferences): String {
-            val id = Hex.toGroupedHexString(Random().nextLong())
-            setInstallationId(pref, id)
-            return id
-        }
-
         @JvmStatic
         fun create(pref: SharedPreferences): AppLaunch = AppLaunch().apply {
             installationId = getInstallationId(pref)
             deviceModel = Build.MODEL
             androidVersion = StaticDeviceInfo.getDetailedAndroidVersion()
             appVersion = Updater.currentVersionName
+            additionalInfo = AppStatisticsAdditionalInfoCollector(pref).collectAsString()
             time = try {
                 FormattedTime.getSimplyFormattedTime()
             } catch (e: IllegalArgumentException) {
@@ -82,6 +86,6 @@ class Feedback(val text: String,
 ) : BeanObject<Feedback>() {
     val androidVersion = StaticDeviceInfo.getDetailedAndroidVersion()
     val time: String = FormattedTime.getSimplyFormattedTime()
-    val installationId: String = AppLaunch.getInstallationId(configPref)
+    val installationId: String = InstallationIdMgr.getInstallationId(configPref)
 }
 

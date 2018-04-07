@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="top|center_horizontal|center|clip_vertical"
+    android:orientation="vertical">
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="151dp"
+        android:layout_height="151dp"
+        android:layout_marginLeft="140dp"
+        android:layout_marginRight="140dp"
+        android:alpha="0.5"
+        android:contentDescription="Crying Face"
+        app:srcCompat="@drawable/ic_search_black_48dp" />
+
+    <TextView
+        android:id="@+id/text_view_result_not_found_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="没有结果"
+        android:textAppearance="@android:style/TextAppearance.Large" />
+
+    <TextView
+        android:id="@+id/text_view_result_not_found_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="请尝试扩大搜索范围"
+        android:textAppearance="@android:style/TextAppearance.Small" />
+
+    <Button
+        android:id="@+id/button_under_crying_face_select_data_sets"
+        style="@style/Widget.AppCompat.ButtonBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp"
+        android:layout_marginTop="20dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:text="选择要显示的名单"
+        android:textColor="@color/colorAccent"
+        android:textStyle="bold" />
+</LinearLayout>

@@ -6,7 +6,7 @@ import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class Processor<in T, out R>(@RunOnNormalThread private val task: (T) -> R) {
+class Processor<T, out R>(@RunOnNormalThread private val task: (T) -> R) {
     private val lock: ReentrantLock = ReentrantLock()
     private val hasDataToProcess: Condition = lock.newCondition()
     private val processorThread: Thread
@@ -17,7 +17,7 @@ class Processor<in T, out R>(@RunOnNormalThread private val task: (T) -> R) {
     @Volatile
     private var dataExpired = true
 
-    private var secondaryComputing: ((R) -> Unit)? = null
+    private var secondaryComputing: ((T, R) -> Unit)? = null
 
     private val mainLoop: Runnable = Runnable {
         while (true) {
@@ -35,7 +35,7 @@ class Processor<in T, out R>(@RunOnNormalThread private val task: (T) -> R) {
             val primaryComputingResult: R? = current?.let { task(it) }
 
             if (current === dataToProcess && primaryComputingResult != null) {
-                secondaryComputing?.invoke(primaryComputingResult)
+                secondaryComputing?.invoke(current!! ,primaryComputingResult)
             }
         }
     }
@@ -56,7 +56,7 @@ class Processor<in T, out R>(@RunOnNormalThread private val task: (T) -> R) {
         }
     }
 
-    @RunnableOnAnyThread fun then(@RunOnNormalThread secondaryComputing: (R) -> Unit) = apply {
+    @RunnableOnAnyThread fun then(@RunOnNormalThread secondaryComputing: (T, R) -> Unit) = apply {
         this@Processor.secondaryComputing = secondaryComputing
     }
 

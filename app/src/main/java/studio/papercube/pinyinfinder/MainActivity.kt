@@ -1,5 +1,6 @@
 package studio.papercube.pinyinfinder
 
+import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.*
 import android.content.pm.ActivityInfo
@@ -17,6 +18,7 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import studio.papercube.pinyinfinder.annotations.LongOperationAgainstUIThread
@@ -25,7 +27,6 @@ import studio.papercube.pinyinfinder.annotations.RunnableOnAnyThread
 import studio.papercube.pinyinfinder.annotations.UiThreadRequired
 import studio.papercube.pinyinfinder.concurrent.Processor
 import studio.papercube.pinyinfinder.concurrent.sharedThreadPool
-import studio.papercube.pinyinfinder.content.Hex
 import studio.papercube.pinyinfinder.content.LOG_TAG_PYF_GENERAL
 import studio.papercube.pinyinfinder.dataloader.DataSet
 import studio.papercube.pinyinfinder.dataloader.InternalDataSets
@@ -41,7 +42,9 @@ import studio.papercube.pinyinfinder.update.Update
 import studio.papercube.pinyinfinder.update.UpdateFailure
 import studio.papercube.pinyinfinder.update.UpdateFailure.CausedBy.*
 import studio.papercube.pinyinfinder.update.Updater
-import studio.papercube.pinyinfinder.widgets.*
+import studio.papercube.pinyinfinder.widgets.SingleDialogManager
+import studio.papercube.pinyinfinder.widgets.autoHidden
+import studio.papercube.pinyinfinder.widgets.lineAppendedIf
 
 /**
  * 应用程序的主界面。第一个活动
@@ -101,6 +104,8 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 
     private lateinit var additionalText: TextView
 
+    private lateinit var viewResultsNotFound: View
+
     private var isInternalDataSetExpired = false
 
     /**
@@ -119,20 +124,74 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
                 .sortedBy { it.person.name.length }
                 .apply { currentResult = this }
         result
-    }.then { filteredResult ->
+    }.then { inputText, filteredResult ->
         runOnUiThread {
-            recyclerViewAdapter.commitData(filteredResult)
             val selectedDataSetsCount = selectedDataSets?.size //已经选择的数据集合（名单）的数量。null代表名单还没有初始化。正常情况下它不应该是null
-            textInfo.text = when {
-                selectedDataSetsCount != 0 -> "在${selectedDataSetsCount ?: "?"}个名单中找到${filteredResult.size}条数据"
-                else -> SpannableStringBuilder()
-                        .append("你没有选择任何名单。")
-                        .appendSpan("更改设置", TextClickableSpan(this@MainActivity).setOnClick {
-                            showDataSelector()
-                        })
+            val resultCount = filteredResult.size
+            recyclerViewAdapter.commitData(filteredResult)
+            when {
+                inputText.isBlank() -> displayInputTextHint()
+                selectedDataSetsCount == 0 -> displayNoSelectedDataSets()
+                inputText.isNotBlank() && resultCount == 0 -> displayNoResultsFound()
+                else -> displayResults(filteredResult)
             }
+//            textInfo.text = when {
+//                selectedDataSetsCount != 0 -> "在${selectedDataSetsCount ?: "?"}个名单中找到${resultCount}条数据"
+//                else -> SpannableStringBuilder()
+//                        .append("你没有选择任何名单。")
+//                        .appendSpan("更改设置", TextClickableSpan(this@MainActivity).setOnClick {
+//                            showDataSelector()
+//                        })
+//            }
         }
     }.startThread()
+
+    private var View.isVisibilityGone: Boolean
+        get() = visibility == View.GONE
+        set(value) {
+            visibility = if (value) View.GONE else View.VISIBLE
+        }
+
+    private fun setResultNotFoundViewDisplayed(flag: Boolean) {
+        viewResultsNotFound.fadeTo(if(flag) 1f else 0f, 300L)
+        recyclerView.fadeTo(if(flag) 0f else 1f, 300L)
+        recyclerView.isVisibilityGone = flag
+        textInfo.isVisibilityGone = flag
+        viewResultsNotFound.isVisibilityGone = !flag
+    }
+
+    private fun View.fadeTo(alpha: Float, duration: Long) {
+        ObjectAnimator.ofFloat(this, "alpha", this.alpha, alpha)
+                .setDuration(duration)
+                .start()
+    }
+
+    private fun displayInputTextHint() {
+        setResultNotFoundViewDisplayed(true)
+        changeViewNotFoundHints("开始搜索吧", "在搜索框中输入内容", false)
+    }
+
+    private fun displayResults(result: List<PersonMatch>) {
+        val selectedDataSetsCount = selectedDataSets?.size?.toString() ?: "?"
+        setResultNotFoundViewDisplayed(false)
+        textInfo.text = "在${selectedDataSetsCount}个名单中找到${result.size}条数据"
+    }
+
+    private fun changeViewNotFoundHints(title: String, subtitle: String, showButton:Boolean = true) {
+        (findViewById<TextView>(R.id.text_view_result_not_found_title)).text = title
+        (findViewById<TextView>(R.id.text_view_result_not_found_subtitle)).text = subtitle
+        (findViewById<Button>(R.id.button_under_crying_face_select_data_sets)).isVisibilityGone = !showButton
+    }
+
+    private fun displayNoResultsFound() {
+        setResultNotFoundViewDisplayed(true)
+        changeViewNotFoundHints("没有结果", "尝试扩大搜索范围")
+    }
+
+    private fun displayNoSelectedDataSets() {
+        setResultNotFoundViewDisplayed(true)
+        changeViewNotFoundHints("你没有选择任何一个名单", "请选择至少一个名单")
+    }
 
 //    private val permissionLock: ReentrantLock = ReentrantLock()
 //    private val bmobPermissionGrantingCondition = permissionLock.newCondition()
@@ -147,24 +206,29 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         //LATE-INIT VAR INITIALIZATIONS
-        recyclerView = findViewById(R.id.listResults) as RecyclerView
+        recyclerView = findViewById(R.id.listResults)
         recyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         recyclerViewAdapter = NamesRecyclerViewAdapter(this)
         recyclerView.adapter = recyclerViewAdapter
         recyclerView.addItemDecoration(DividerItemDecoration(this, LinearLayoutManager.VERTICAL))
 
-        editTextSearch = findViewById(R.id.editTextSearch) as EditText
-        recyclerView = findViewById(R.id.listResults) as RecyclerView
-        textInfo = findViewById(R.id.textInfo) as TextView
+        editTextSearch = findViewById(R.id.editTextSearch)
+        recyclerView = findViewById(R.id.listResults)
+        textInfo = findViewById(R.id.textInfo)
         textInfo.movementMethod = LinkMovementMethod.getInstance() //???
         topView = findViewById(R.id.topView)
 //        additionalTextMgr = AutoFitTextViewManager(findViewById(R.id.additionalText) as TextView)
-        additionalText = findViewById(R.id.additionalText) as TextView
+        additionalText = findViewById(R.id.additionalText)
+        viewResultsNotFound = findViewById(R.id.view_results_not_found)
 
         sharedPreferences = getSharedPreferences("AppConfig", Context.MODE_PRIVATE)
 
         Updater.currentVersionCode = packageManager.getPackageInfo(packageName, 0).versionCode //指定当前应用的版本号
         Updater.currentVersionName = packageManager.getPackageInfo(packageName, 0).versionName //指定当前应用的版本
+
+        findViewById<Button>(R.id.button_under_crying_face_select_data_sets).setOnClickListener {
+            showDataSelector()
+        }
 
         createProgressDialog("正在加载数据") {
             loadPreferredData()
@@ -191,7 +255,6 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
             }
 
             saveAppLaunchToBmob()
-
         }
 
         try {

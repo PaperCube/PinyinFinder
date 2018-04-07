@@ -6,9 +6,12 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
+import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import studio.papercube.pinyinfinder.content.Hex.toHexString
 import studio.papercube.pinyinfinder.content.LOG_TAG_PYF_GENERAL
+import studio.papercube.pinyinfinder.content.LOG_TAG_PYF_UI_EVENTS
 import studio.papercube.pinyinfinder.datatransfer.Feedback
 import studio.papercube.pinyinfinder.datatransfer.createBmobPostRequest
 import studio.papercube.pinyinfinder.datatransfer.newCallWith
@@ -19,7 +22,7 @@ class FeedbackActivity : AppCompatActivity() {
         const val RESULT_CODE_SUCCESS = 2
     }
 
-    private lateinit var topView:View
+    private lateinit var topView: View
     private lateinit var feedbackPreferences: SharedPreferences
     private lateinit var configPreferences: SharedPreferences
     private lateinit var editTextFeedback: EditText
@@ -30,7 +33,13 @@ class FeedbackActivity : AppCompatActivity() {
         topView = findViewById(R.id.layout_top_of_feedback_activity)
         feedbackPreferences = getSharedPreferences("Feedback", Context.MODE_PRIVATE)
         configPreferences = getSharedPreferences("AppConfig", Context.MODE_PRIVATE)
-        editTextFeedback = findViewById(R.id.edit_text_feedback) as EditText
+        editTextFeedback = findViewById(R.id.edit_text_feedback)
+        val supportActionBar = supportActionBar
+        if (supportActionBar != null) {
+            supportActionBar.subtitle = "反馈"
+            supportActionBar.setHomeButtonEnabled(true)
+            supportActionBar.setDisplayHomeAsUpEnabled(true) //display the back button on the action bar. use supportActionBar
+        }
         editTextFeedback.text = savedFeedback.toEditable()
     }
 
@@ -46,16 +55,27 @@ class FeedbackActivity : AppCompatActivity() {
 
     private val textFeedbackOnUi: String get() = editTextFeedback.text.toString()
 
-    private fun autoSave(){
+    private fun autoSave() {
         val text = textFeedbackOnUi
         if (!text.isBlank()) {
             savedFeedback = text
         }
     }
 
+    override fun onOptionsItemSelected(item: MenuItem?): Boolean {
+        val itemId = item?.itemId
+        when (itemId) {
+            android.R.id.home -> finish()
+            else -> {
+                Log.i(LOG_TAG_PYF_UI_EVENTS, "${this.javaClass.name}: Unhandled options item ${item?.itemId?.toHexString()}")
+            }
+        }
+        return true
+    }
+
     fun onClickSubmitFeedback(view: View) {
         val feedbackText = textFeedbackOnUi
-        if(feedbackText.isBlank()){
+        if (feedbackText.isBlank()) {
             topView.createSnackBar("请输入内容")
             return
         }
@@ -63,7 +83,8 @@ class FeedbackActivity : AppCompatActivity() {
         savedFeedback = feedbackText
 
         val progressDialog = ProgressDialog.show(this, null, "正在发送", true, false)
-        val submitThread = Thread { //TODO make it cancellable
+        val submitThread = Thread {
+            //TODO make it cancellable
             var failureDescriptor: Any? = null
             var responseBodyString: String? = null
             var failed = false
