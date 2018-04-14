@@ -5,8 +5,8 @@ import java.io.InputStream
 open class SimpleTransformInputStream(private val inputStream: InputStream) : InputStream() {
     override fun read(): Int {
         return inputStream.read().let {
-            if (it != -1) return applyTransform(it)
-            else return -1
+            if (it != -1) applyTransform(it)
+            else -1
         }
     }
 
