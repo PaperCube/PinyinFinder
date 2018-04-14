@@ -25,7 +25,7 @@ enum class InternalDataSets(private val url: String, override val dataName: Stri
 
     override val inputStream: InputStream
         get() {
-            return SimpleTranformInputStream(javaClass.getResourceAsStream(url))
+            return SimpleTransformInputStream(javaClass.getResourceAsStream(url))
         }
 
 }

@@ -2,7 +2,7 @@ package studio.papercube.pinyinfinder.dataloader
 
 import java.io.InputStream
 
-open class SimpleTranformInputStream(private val inputStream: InputStream) : InputStream() {
+open class SimpleTransformInputStream(private val inputStream: InputStream) : InputStream() {
     override fun read(): Int {
         return inputStream.read().let {
             if (it != -1) return applyTransform(it)
