@@ -16,8 +16,8 @@ android {
         applicationId "studio.papercube.pinyinfinder.android"
         minSdkVersion 15
         targetSdkVersion 26
-        versionCode 41
-        versionName "18.04"
+        versionCode 42
+        versionName "18.04.1"
 //        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
