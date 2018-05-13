@@ -405,9 +405,9 @@ class MainActivity : AppCompatActivity(), ActivityCompat.OnRequestPermissionsRes
 
             //TODO WARNING AND IMPROVEMENTS: SWAP LAMBDA AND OTHER ARGS. DataSet situation may change in the future. Be aware of these data-set specific codes.
             SpannableStringBuilder()
-                    .lineAppendedIf((text.toIntOrNull() ?: 0) in 100..120, ForegroundColorSpan(Colors.colorError)) {
-                        "抱歉，还没有高一级部的名单"
-                    }
+//                    .lineAppendedIf((text.toIntOrNull() ?: 0) in 100..120, ForegroundColorSpan(Colors.colorError)) {
+//                        "抱歉，还没有高一级部的名单"
+//                    }
                     .lineAppendedIf((text.toIntOrNull() ?: 0) in 300..320, ForegroundColorSpan(Colors.colorError)) {
                         "没有高三级部的班级信息"
                     }
